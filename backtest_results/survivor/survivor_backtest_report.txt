@@ -1,0 +1,37 @@
+================================================================================
+PERFORMANCE METRICS REPORT
+================================================================================
+
+RETURN METRICS
+--------------------------------------------------------------------------------
+Initial Capital: ₹1,000,000.00
+Final Capital: ₹1,000,000.00
+Absolute Profit: ₹0.00
+Total Return: 0.00%
+CAGR: 0.00%
+
+RISK METRICS
+--------------------------------------------------------------------------------
+Max Drawdown: 0.00%
+Volatility (Annual): 0.00%
+Sharpe Ratio: 0.000
+Sortino Ratio: 0.000
+Calmar Ratio: 0.000
+VaR (95%): 0.0000
+Recovery Factor: 0.00
+
+TRADE METRICS
+--------------------------------------------------------------------------------
+Total Trades: 325
+Winning Trades: 325
+Losing Trades: 0
+Win Rate: 100.00%
+Average Win: ₹567.69
+Average Loss: ₹0.00
+Average Trade: ₹567.69
+Profit Factor: 0.00
+Expectancy: ₹567.69
+Max Consecutive Wins: 325
+Max Consecutive Losses: 0
+
+================================================================================

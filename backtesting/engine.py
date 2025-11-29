@@ -81,16 +81,15 @@ class MockBroker:
 
     def get_quote(self, symbol):
         """Return mock quote"""
-        from brokers import Quote
+        from brokers import Quote, Exchange
 
         price = self.current_price.get(symbol, 0)
         return Quote(
             symbol=symbol,
+            exchange=Exchange.NFO,  # Default to NFO
             last_price=price,
-            open=price,
-            high=price,
-            low=price,
-            close=price,
+            bid=price,
+            ask=price,
             volume=0
         )
 
@@ -100,14 +99,16 @@ class MockBroker:
 
     def get_positions(self):
         """Return current positions"""
-        from brokers import Position
+        from brokers import Position, Exchange
 
         positions = []
         for symbol, pos in self.positions.items():
             if pos['quantity'] != 0:
                 positions.append(Position(
                     symbol=symbol,
+                    exchange=Exchange.NFO,  # Default to NFO
                     quantity_total=pos['quantity'],
+                    quantity_available=pos['quantity'],  # All available in backtest
                     average_price=pos['avg_price'],
                     pnl=0  # Will be calculated separately
                 ))
