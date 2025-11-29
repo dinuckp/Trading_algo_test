@@ -152,7 +152,12 @@ class BrokerGateway:
             chunk_end = current_end.strftime("%Y-%m-%d")
             
             # Get data for this chunk
-            chunk_data = self.driver.get_history(broker_symbol, interval, chunk_start, chunk_end, oi)
+            # Check if driver supports OI parameter (Fyers) or not (Zerodha)
+            try:
+                chunk_data = self.driver.get_history(broker_symbol, interval, chunk_start, chunk_end, oi)
+            except TypeError:
+                # Driver doesn't support oi parameter (e.g., Zerodha)
+                chunk_data = self.driver.get_history(broker_symbol, interval, chunk_start, chunk_end)
             
             # Extend results with chunk data
             if chunk_data:
