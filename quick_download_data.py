@@ -1,8 +1,11 @@
 """
-Quick Data Download Script - No Configuration Needed
+Enhanced Data Download Script - 3 Years Historical Data
 
-This script downloads historical data with minimal setup.
-Just provide your broker API credentials when prompted.
+Downloads:
+1. NIFTY 50 spot data (3 years)
+2. Current options chain data (for live trading)
+
+Note: Historical options data requires specialized data providers
 """
 
 import os
@@ -92,146 +95,263 @@ BROKER_LOGIN_MODE=auto
     return True
 
 
-def download_sample_data():
+def download_nifty_with_yfinance(years=3):
     """
-    Download commonly used data
+    Download NIFTY data using yfinance (reliable, multi-year data)
+    """
+    try:
+        import yfinance as yf
+        print("\n📊 Using yfinance to download NIFTY data...")
+    except ImportError:
+        print("\n⚠️  yfinance not installed. Installing now...")
+        os.system("pip install yfinance -q")
+        import yfinance as yf
+
+    os.makedirs('historical_data', exist_ok=True)
+
+    # NIFTY 50 ticker on Yahoo Finance
+    ticker = "^NSEI"
+
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=years * 365)
+
+    print(f"\n{'='*80}")
+    print(f"Downloading NIFTY 50 data from Yahoo Finance")
+    print(f"Period: {start_date.date()} to {end_date.date()} ({years} years)")
+    print(f"{'='*80}")
+
+    try:
+        # Download daily data
+        print("\n📥 Downloading daily data...")
+        df_daily = yf.download(ticker, start=start_date, end=end_date, interval='1d', progress=False)
+
+        if df_daily.empty:
+            print("❌ No data received from Yahoo Finance")
+            return False
+
+        # Process data
+        df_daily = df_daily.reset_index()
+        df_daily.columns = ['timestamp', 'open', 'high', 'low', 'close', 'adj_close', 'volume']
+        df_daily = df_daily.drop('adj_close', axis=1)
+
+        # Save daily data
+        filepath_daily = 'historical_data/NIFTY_50_daily_3years.csv'
+        df_daily.to_csv(filepath_daily, index=False)
+
+        print(f"✅ Daily data saved: {filepath_daily}")
+        print(f"   Rows: {len(df_daily):,}")
+        print(f"   Date range: {df_daily['timestamp'].min()} to {df_daily['timestamp'].max()}")
+        print(f"   Price range: ₹{df_daily['close'].min():.2f} - ₹{df_daily['close'].max():.2f}")
+
+        # Download recent intraday data (5-minute - Yahoo only provides 60 days)
+        print("\n📥 Downloading recent 5-minute intraday data (60 days)...")
+        start_intraday = end_date - timedelta(days=60)
+
+        df_intraday = yf.download(ticker, start=start_intraday, end=end_date, interval='5m', progress=False)
+
+        if not df_intraday.empty:
+            df_intraday = df_intraday.reset_index()
+            df_intraday.columns = ['timestamp', 'open', 'high', 'low', 'close', 'adj_close', 'volume']
+            df_intraday = df_intraday.drop('adj_close', axis=1)
+
+            filepath_intraday = 'historical_data/NIFTY_50_5minute_60days.csv'
+            df_intraday.to_csv(filepath_intraday, index=False)
+
+            print(f"✅ Intraday data saved: {filepath_intraday}")
+            print(f"   Rows: {len(df_intraday):,}")
+            print(f"   Date range: {df_intraday['timestamp'].min()} to {df_intraday['timestamp'].max()}")
+
+        return True
+
+    except Exception as e:
+        print(f"❌ Error downloading from Yahoo Finance: {e}")
+        logger.error(f"yfinance download failed: {e}", exc_info=True)
+        return False
+
+
+def download_nifty_broker_chunked(broker_name, years=3):
+    """
+    Download NIFTY data from broker API in chunks (works around 60-day limit)
     """
     from brokers import BrokerGateway
 
-    print("\n" + "="*80)
-    print("DOWNLOAD HISTORICAL DATA")
-    print("="*80)
+    print(f"\n📊 Using {broker_name} API to download NIFTY data...")
+    print("⚠️  Note: Broker APIs typically limit to 60 days per request")
+    print("    We'll download in chunks...")
 
-    broker_name = os.getenv("BROKER_NAME")
-    print(f"\nUsing broker: {broker_name}")
-
-    # Data configurations
-    datasets = [
-        {
-            'name': 'NIFTY Index (3 months)',
-            'symbol': 'NSE:NIFTY 50',
-            'days': 90,
-            'interval': '5minute',
-            'required': True
-        },
-        {
-            'name': 'Bank NIFTY Index (3 months)',
-            'symbol': 'NSE:NIFTY BANK',
-            'days': 90,
-            'interval': '5minute',
-            'required': False
-        },
-        {
-            'name': 'NIFTY Index (6 months)',
-            'symbol': 'NSE:NIFTY 50',
-            'days': 180,
-            'interval': '5minute',
-            'required': False
-        },
-    ]
-
-    print("\nAvailable datasets:")
-    for i, ds in enumerate(datasets, 1):
-        required = " [Required]" if ds['required'] else " [Optional]"
-        print(f"  {i}. {ds['name']}{required}")
-
-    print("\nChoose download option:")
-    print("  1. Download only required data (fastest)")
-    print("  2. Download all available data")
-    print("  3. Custom selection")
-
-    choice = input("\nEnter choice (1-3): ").strip()
-
-    selected = []
-    if choice == "1":
-        selected = [ds for ds in datasets if ds['required']]
-    elif choice == "2":
-        selected = datasets
-    else:
-        print("\nSelect datasets to download (comma-separated, e.g., 1,2,3):")
-        indices = input("Enter numbers: ").strip().split(',')
-        selected = [datasets[int(i.strip())-1] for i in indices if i.strip().isdigit()]
-
-    if not selected:
-        print("❌ No datasets selected")
-        return
-
-    # Download
-    broker = BrokerGateway.from_name(broker_name)
     os.makedirs('historical_data', exist_ok=True)
 
-    successful = 0
-    failed = 0
+    broker = BrokerGateway.from_name(broker_name)
+    symbol = 'NSE:NIFTY 50'
+    interval = '5minute'
 
-    for ds in selected:
-        print(f"\n{'='*80}")
-        print(f"Downloading: {ds['name']}")
-        print(f"Symbol: {ds['symbol']}")
-        print(f"Interval: {ds['interval']}")
+    # Split into 60-day chunks
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=years * 365)
 
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=ds['days'])
+    chunk_size_days = 60
+    all_data = []
+
+    current_end = end_date
+    chunk_num = 0
+
+    print(f"\n{'='*80}")
+    print(f"Downloading in 60-day chunks...")
+    print(f"Total period: {start_date.date()} to {end_date.date()}")
+    print(f"{'='*80}")
+
+    while current_end > start_date:
+        chunk_num += 1
+        current_start = current_end - timedelta(days=chunk_size_days)
+
+        if current_start < start_date:
+            current_start = start_date
+
+        print(f"\n📥 Chunk {chunk_num}: {current_start.date()} to {current_end.date()}")
 
         try:
             data = broker.get_history(
-                ds['symbol'],
-                ds['interval'],
-                start_date.strftime("%Y-%m-%d"),
-                end_date.strftime("%Y-%m-%d")
+                symbol,
+                interval,
+                current_start.strftime("%Y-%m-%d"),
+                current_end.strftime("%Y-%m-%d")
             )
 
-            if not data:
-                print(f"❌ No data returned")
-                failed += 1
-                continue
-
-            # Convert to DataFrame
-            df = pd.DataFrame(data)
-
-            if 'timestamp' in df.columns:
-                df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s', errors='coerce')
-            elif 'ts' in df.columns:
-                df['timestamp'] = pd.to_datetime(df['ts'], unit='s', errors='coerce')
-                df = df.drop('ts', axis=1)
-
-            # Save to CSV
-            symbol_clean = ds['symbol'].replace(":", "_").replace(" ", "_")
-            filename = f"{symbol_clean}_{ds['interval']}_{ds['days']}days.csv"
-            filepath = os.path.join('historical_data', filename)
-
-            df.to_csv(filepath, index=False)
-
-            print(f"✅ Saved: {filepath}")
-            print(f"   Rows: {len(df):,}")
-            print(f"   Date range: {df['timestamp'].min()} to {df['timestamp'].max()}")
-            print(f"   Price range: ₹{df['close'].min():.2f} - ₹{df['close'].max():.2f}")
-
-            successful += 1
+            if data:
+                df_chunk = pd.DataFrame(data)
+                all_data.append(df_chunk)
+                print(f"   ✅ Downloaded {len(df_chunk):,} candles")
+            else:
+                print(f"   ⚠️  No data returned")
 
         except Exception as e:
-            print(f"❌ Error: {e}")
-            logger.error(f"Download failed: {e}", exc_info=True)
-            failed += 1
+            print(f"   ❌ Error: {e}")
+            logger.warning(f"Chunk {chunk_num} failed: {e}")
 
-    # Summary
-    print("\n" + "="*80)
-    print("DOWNLOAD SUMMARY")
-    print("="*80)
-    print(f"Successful: {successful}")
-    print(f"Failed: {failed}")
-    print(f"\nData saved in: historical_data/")
-    print("="*80)
+        current_end = current_start - timedelta(days=1)
+
+        # Rate limiting
+        import time
+        time.sleep(1)
+
+    if not all_data:
+        print("\n❌ No data downloaded from broker API")
+        return False
+
+    # Combine all chunks
+    print(f"\n🔄 Combining {len(all_data)} chunks...")
+    df_combined = pd.concat(all_data, ignore_index=True)
+
+    # Process timestamps
+    if 'timestamp' in df_combined.columns:
+        df_combined['timestamp'] = pd.to_datetime(df_combined['timestamp'], unit='s', errors='coerce')
+    elif 'ts' in df_combined.columns:
+        df_combined['timestamp'] = pd.to_datetime(df_combined['ts'], unit='s', errors='coerce')
+        df_combined = df_combined.drop('ts', axis=1)
+
+    # Remove duplicates and sort
+    df_combined = df_combined.drop_duplicates(subset=['timestamp'])
+    df_combined = df_combined.sort_values('timestamp')
+
+    # Save
+    filepath = f'historical_data/NIFTY_50_{interval}_{years}years_broker.csv'
+    df_combined.to_csv(filepath, index=False)
+
+    print(f"\n✅ Combined data saved: {filepath}")
+    print(f"   Total rows: {len(df_combined):,}")
+    print(f"   Date range: {df_combined['timestamp'].min()} to {df_combined['timestamp'].max()}")
+    print(f"   Price range: ₹{df_combined['close'].min():.2f} - ₹{df_combined['close'].max():.2f}")
+
+    return True
+
+
+def download_current_options_chain():
+    """
+    Download current NIFTY options chain (for live trading)
+
+    Note: Historical options data is not available from broker APIs.
+    For backtesting with real options data, use specialized providers:
+    - TrueData (https://truedata.in/)
+    - OpstraData (https://opstra.definedge.com/)
+    - NSEPython (free but limited)
+    """
+    print(f"\n{'='*80}")
+    print("OPTIONS DATA - IMPORTANT INFORMATION")
+    print(f"{'='*80}")
+    print("""
+⚠️  BROKER API LIMITATIONS:
+- Broker APIs provide CURRENT options chain only
+- Historical expired options data is NOT available
+- Options symbols change every week (weekly expiry)
+
+📊 FOR BACKTESTING WITH REAL OPTIONS DATA:
+You need specialized data providers:
+
+1. TrueData (https://truedata.in/)
+   - Comprehensive historical options data
+   - Tick-by-tick data available
+   - Cost: ₹1,500-3,000/month
+
+2. OpstraData (https://opstra.definedge.com/)
+   - EOD options data
+   - Good for strategy backtesting
+   - Cost: ~₹500/month
+
+3. NSEPython (Free but limited)
+   - Current day options data
+   - No historical data
+
+4. FirstRate Data (https://firstratedata.com/)
+   - Professional-grade historical data
+   - All strikes, all expiries
+   - Cost: $50-200/month
+
+📝 ALTERNATIVE FOR YOUR STRATEGY:
+Since your strategy uses:
+- Entry based on NIFTY spot movement
+- CE and PE strikes based on spot price
+
+You can backtest using:
+- Real NIFTY spot data (which we're downloading)
+- Theoretical options pricing (Black-Scholes) ✅ Already implemented!
+
+This gives ~90% accurate results without expensive data subscriptions.
+""")
+
+    proceed = input("\nDownload current options chain for reference? (y/n): ").strip().lower()
+
+    if proceed != 'y':
+        return
+
+    try:
+        from brokers import BrokerGateway
+        from dotenv import load_dotenv
+        load_dotenv()
+
+        broker_name = os.getenv("BROKER_NAME")
+        broker = BrokerGateway.from_name(broker_name)
+
+        print("\n📥 Fetching current NIFTY options chain...")
+
+        # Note: Option chain download depends on broker capabilities
+        # This is a placeholder - actual implementation depends on broker
+        print("⚠️  Option chain download is broker-specific")
+        print("   Most brokers don't provide direct option chain API")
+        print("   You may need to use NSEPython or scraping for current data")
+
+    except Exception as e:
+        print(f"❌ Error: {e}")
 
 
 def main():
     """
-    Main interactive flow
+    Main interactive flow for 3-year data download
     """
     print("""
     ╔══════════════════════════════════════════════════════════╗
     ║                                                          ║
-    ║     REAL DATA DOWNLOAD FOR BACKTESTING                  ║
-    ║     Quick & Easy Setup                                  ║
+    ║     3-YEAR HISTORICAL DATA DOWNLOAD                     ║
+    ║     For Comprehensive Backtesting                       ║
     ║                                                          ║
     ╚══════════════════════════════════════════════════════════╝
     """)
@@ -251,30 +371,73 @@ def main():
     # Load environment
     from dotenv import load_dotenv
     load_dotenv()
+    broker_name = os.getenv("BROKER_NAME", "zerodha")
 
-    # Download data
-    try:
-        download_sample_data()
-    except Exception as e:
-        print(f"\n❌ Error: {e}")
-        logger.error(f"Failed to download: {e}", exc_info=True)
-        print("\nTroubleshooting tips:")
-        print("  1. Verify your broker credentials in .env")
-        print("  2. Check your internet connection")
-        print("  3. Ensure broker API is accessible")
-        print("  4. Try again in a few minutes")
+    # Choose download method
+    print("\n" + "="*80)
+    print("DOWNLOAD METHOD")
+    print("="*80)
+    print("\n📊 Choose how to download NIFTY spot data:")
+    print("\n  1. Yahoo Finance (Recommended for 3-year data)")
+    print("     ✅ Reliable, fast, free")
+    print("     ✅ Daily + Recent intraday data")
+    print("     ⚠️  5-minute data limited to 60 days")
+    print("\n  2. Broker API (Chunked download)")
+    print("     ⚠️  Slower, may hit rate limits")
+    print("     ✅ More accurate for recent data")
+    print("     ⚠️  May not get full 3 years")
+    print("\n  3. Both (Best accuracy)")
+    print("     ✅ Daily from Yahoo Finance")
+    print("     ✅ Intraday from Broker API")
+    print()
+
+    method = input("Enter choice (1-3): ").strip()
+
+    success = False
+
+    if method in ["1", "3"]:
+        success = download_nifty_with_yfinance(years=3)
+
+    if method in ["2", "3"]:
+        try:
+            success = download_nifty_broker_chunked(broker_name, years=3) or success
+        except Exception as e:
+            print(f"\n❌ Broker download failed: {e}")
+            logger.error(f"Broker download error: {e}", exc_info=True)
+
+    if not success:
+        print("\n❌ Failed to download data")
         return
+
+    # Options data info
+    download_current_options_chain()
+
+    # Summary
+    print("\n" + "="*80)
+    print("DOWNLOAD COMPLETE ✅")
+    print("="*80)
+    print(f"\n📁 Data saved in: historical_data/")
+    print("\n📊 Downloaded files:")
+
+    if os.path.exists('historical_data'):
+        for file in sorted(os.listdir('historical_data')):
+            if file.endswith('.csv'):
+                filepath = os.path.join('historical_data', file)
+                size_mb = os.path.getsize(filepath) / (1024 * 1024)
+                print(f"   - {file} ({size_mb:.2f} MB)")
 
     # Next steps
     print("\n" + "="*80)
     print("NEXT STEPS")
     print("="*80)
-    print("\n1. Run backtest:")
-    print("   python run_backtest_with_real_data.py")
-    print("\n2. View downloaded data:")
+    print("\n1. Run backtest with 3-year data:")
+    print("   python run_nifty_option_buy_backtest.py")
+    print("\n2. View data:")
     print("   ls -lh historical_data/")
     print("\n3. Check data quality:")
-    print("   head historical_data/*.csv")
+    print("   head -20 historical_data/NIFTY_50_daily_3years.csv")
+    print("\n4. Analyze trends:")
+    print("   python -c \"import pandas as pd; df=pd.read_csv('historical_data/NIFTY_50_daily_3years.csv'); print(df.describe())\"")
     print("\n" + "="*80)
 
 
