@@ -1,15 +1,54 @@
+# Environment and secrets
 .env
 .venc
+.kite_token.json
+*.pem
+*.key
+
+# Python
 __pycache__/
+*.pyc
+
+# Logs
 *.log
-brokers/core/.gateway.py.swp
-logs/system.log.2025-08-28
-logs/system.log.2025-09-01
-logs/system.log.2025-08-29
-logs/system.log.2025-09-03
-strategy/.wave.py.swp
-strategy/.cache/zerodha_master_contract.csv
-strategy/configs/.wave.yml.swp
-brokers/.DS_Store
-.cache/zerodha_master_contract.csv
+logs/
+system.log.*
+
+# Node.js
+node_modules/
+package-lock.json
+yarn.lock
+
+# Build outputs
+dist/
+*.tsbuildinfo
+
+# Testing
+coverage/
+.nyc_output/
+
+# Cache
+.cache/
+*.cache
+zerodha_master_contract.csv
+
+# Editor/IDE
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Project specific
 wave_new.py
+brokers/.DS_Store
+
+# Backtest results
+backtest_results/
+*.csv
+
+# Temporary files
+tmp/
+temp/
