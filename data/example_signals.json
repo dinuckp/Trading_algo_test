@@ -1,0 +1,31 @@
+[
+  {
+    "symbol": "NIFTY24DEC20000CE",
+    "instrumentToken": 12345,
+    "action": "BUY",
+    "quantity": 25,
+    "reason": "Price moved UP by 52.5 points in 300s",
+    "confidence": 0.85,
+    "timestamp": "2024-12-01T09:20:00.000Z",
+    "metadata": {
+      "direction": "UP",
+      "priceChange": 52.5,
+      "spotPrice": 20050,
+      "optionType": "CE"
+    }
+  },
+  {
+    "symbol": "NIFTY24DEC20000CE",
+    "instrumentToken": 12345,
+    "action": "SELL",
+    "quantity": 25,
+    "reason": "PROFIT_TARGET",
+    "confidence": 1,
+    "timestamp": "2024-12-01T09:35:00.000Z",
+    "metadata": {
+      "entryPrice": 156.5,
+      "exitPrice": 165.0,
+      "pnl": 212.5
+    }
+  }
+]
